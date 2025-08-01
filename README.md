@@ -1,5 +1,7 @@
 # Home Assistant Vibration Sensor Filter Blueprint
 
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2Faxeldavid%2FVibrationSensorApplianceFilterBlueprint%2Fblob%2Fmaster%2FVibrationSensorApplianceFilter.yaml)
+
 This blueprint filters a vibration sensor's state to robustly track the running status of appliances like a washing machine or dryer.
 The running state can then be used for automations to send a notification once the appliance is done.
 
