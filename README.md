@@ -5,6 +5,10 @@
 This blueprint filters a vibration sensor's state to robustly track the running status of appliances like a washing machine or dryer.
 The running state can then be used for automations to send a notification once the appliance is done.
 
+## Tested sensor
+
+This blueprint has been successfully tested with a binary vibration sensor (Tuya Zigbee TS0601 model). The sensor used for testing was purchased for around 5 EUR from [AliExpress](https://www.aliexpress.com/item/1005008119507565.html).
+
 ## Limitations
 
 The filter is optimized to reliably detect that a washing cycle has **stopped**, and prevent those conditions from being triggered more than once during a cycle (false positives).
