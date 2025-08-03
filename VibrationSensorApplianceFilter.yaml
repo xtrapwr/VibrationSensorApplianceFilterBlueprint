@@ -19,8 +19,14 @@ blueprint:
     stop_delay:
       name: Started-to-Stopped transition threshold
       description: >
-        The minimum duration of continuous inactivity required to consider the appliance **Stopped**. This value also determines the delay between
-        the end of a cycle and when the helper's state updates, which can be used to trigger a notification or for other automations.
+        The minimum duration of inactivity needed to consider the appliance **Stopped**. This sets the delay for end-of-cycle notifications.
+        
+
+        Consequences of misconfiguration:
+
+        - **Too short**: Can lead to false positives, such as a single cycle being broken into multiple, or an unrelated vibration being mistaken for a new cycle.
+
+        - **Too long**: Excessive delay of cycle end detection.
       selector:
         duration:
       default:
@@ -31,8 +37,15 @@ blueprint:
       name: Stopped-to-Started transition threshold
       description: >
         For how long, a cycle's vibrations must continue without interruptions that exceed the **Started-to-Stopped** threshold.
-        This value should be longer than any non-cycle-related vibrations plus the **Started-to-Stopped** threshold, but shorter
-        than your shortest program cycle.
+        This must be longer than the **Started-to-Stopped** threshold, plus the maximum duration of any brief, non-cycle related vibrations.
+        It must also be shorter than your shortest program cycle.
+        
+        
+        Consequences of misconfiguration:
+
+        - **Too short**: Can lead to false positives.
+
+        - **Too long**: A cycle might not be detected at all.
       selector:
         duration:
       default:

@@ -43,7 +43,7 @@ To select a value, identify the longest vibration-free gap within any running cy
 **Note:** *For this to be robust across multiple washing program, ensure this value is longer than the longest gap in any program.*
 
 #### Tune the Stopped-to-Started transition threshold
-This threshold is a safety buffer that prevents the automation from starting a new cycle based on brief, non-cycle-related vibrations, such as events **C** and **D**.
+This threshold is a safety buffer to prevent the automation from starting a new cycle based on brief, non-cycle-related vibrations, such as events **C** and **D**, or vibrations from unloading the appliance. The **Started** timer needs to be long enough to account for these brief vibrations, plus enough time to give the **Stopped** timer a chance to cancel it afterwards. This prevents the Started timer from finishing too quickly and incorrectly marking the appliance as running.
 
 To select a value, follow these steps:
 
