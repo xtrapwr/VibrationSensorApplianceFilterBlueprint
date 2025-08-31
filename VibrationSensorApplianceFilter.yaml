@@ -53,7 +53,7 @@ blueprint:
         minutes: 10
         seconds: 0
     running_state_helper:
-      name: Started/Stopped State Helper (input_boolean)
+      name: Started/Stopped State Helper (binary_sensor)
       description: >
         This is the main output of the blueprint. It is a toggle helper that stores the **Started**/**Stopped** state.
         
@@ -63,7 +63,8 @@ blueprint:
       selector:
         entity:
           filter:
-            - domain: input_boolean
+            - domain: binary_sensor
+            device_class: running
           multiple: false
     started_timer_helper:
       name: Started Timer Helper
