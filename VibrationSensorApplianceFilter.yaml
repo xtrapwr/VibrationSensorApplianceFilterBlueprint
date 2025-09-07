@@ -1,7 +1,8 @@
 blueprint:
-  name: Vibration Sensor Filter
+  name: Vibration Sensor Filter (with Short Vibration Filter)
   description: >
     Filters a vibration sensor to detect when a vibrating appliance (like a washing machine or dryer) stops running.
+    This version includes an additional filter to ignore brief, incidental vibrations.
 
     Before configuring the blueprint, mount the vibration sensor on the appliance and run a few cycles to gather historic data to tune the filter.
     For more detailed tuning instructions and visuals, see the blueprint's repository's [README file](https://github.com/axeldavid/VibrationSensorApplianceFilterBlueprint).
@@ -16,17 +17,22 @@ blueprint:
             - domain: binary_sensor
               device_class: vibration
           multiple: false
+
+    short_vibration_delay:
+      name: Short Vibration Filter
+      description: >
+        Ignore vibrations that are shorter than this duration. This helps filter out false starts from brief, incidental vibrations.
+      selector:
+        duration:
+      default:
+        hours: 0
+        minutes: 1
+        seconds: 30
+
     stop_delay:
       name: Started-to-Stopped transition threshold
       description: >
         The minimum duration of inactivity needed to consider the appliance **Stopped**. This sets the delay for end-of-cycle notifications.
-        
-
-        Consequences of misconfiguration:
-
-        - **Too short**: Can lead to false positives, such as a single cycle being broken into multiple, or an unrelated vibration being mistaken for a new cycle.
-
-        - **Too long**: Excessive delay of cycle end detection.
       selector:
         duration:
       default:
@@ -37,15 +43,6 @@ blueprint:
       name: Stopped-to-Started transition threshold
       description: >
         For how long, a cycle's vibrations must continue without interruptions that exceed the **Started-to-Stopped** threshold.
-        This must be longer than the **Started-to-Stopped** threshold, plus the maximum duration of any brief, non-cycle related vibrations.
-        It must also be shorter than your shortest program cycle.
-        
-        
-        Consequences of misconfiguration:
-
-        - **Too short**: Can lead to false positives.
-
-        - **Too long**: A cycle might not be detected at all.
       selector:
         duration:
       default:
@@ -53,18 +50,13 @@ blueprint:
         minutes: 10
         seconds: 0
     running_state_helper:
-      name: Started/Stopped State Helper (binary_sensor)
+      name: Started/Stopped State Helper (input_boolean)
       description: >
         This is the main output of the blueprint. It is a toggle helper that stores the **Started**/**Stopped** state.
-        
-        - The **Stopped** state will lag behind the actual end of the cycle by the **Started-to-Stopped** transition threshold duration.
-        
-        - The **Started** state is not representative of the actual start time of the cycle and cannot reliably be used for automations that require precise timing.
       selector:
         entity:
           filter:
-            - domain: binary_sensor
-              device_class: running
+            - domain: input_boolean
           multiple: false
     started_timer_helper:
       name: Started Timer Helper
@@ -82,59 +74,48 @@ blueprint:
           filter:
             - domain: timer
           multiple: false
+    debounce_timer_helper:
+      name: Debounce Timer Helper
+      description: A timer helper used to filter out short vibrations. Create a blank timer for this.
+      selector:
+        entity:
+          filter:
+            - domain: timer
+          multiple: false
 
 variables:
   started_timer_id: !input started_timer_helper
   stopped_timer_id: !input stopped_timer_helper
+  debounce_timer_id: !input debounce_timer_helper
 
 mode: single
 max_exceeded: silent
 
 triggers:
-  - trigger: state
+  - platform: state
     entity_id: !input vibration_sensor
     to: ["on", "off"]
-  - trigger: event
+  - platform: event
     event_type: timer.finished
     event_data:
       entity_id: !input started_timer_helper
-  - trigger: event
+  - platform: event
     event_type: timer.finished
     event_data:
       entity_id: !input stopped_timer_helper
+  - platform: event
+    event_type: timer.finished
+    event_data:
+      entity_id: !input debounce_timer_helper
 
 condition: []
 
 actions:
   - choose:
-      # Started timer finished: Switch the running state to Started
+      # Debounce timer finished: Vibration is confirmed, proceed with main logic.
       - conditions:
           - condition: template
-            value_template: "{{ trigger.event is defined and trigger.event.data.entity_id == started_timer_id }}"
-        sequence:
-          - action: input_boolean.turn_on
-            target:
-              entity_id: !input running_state_helper
-          - stop: 'Appliance state set to Started, "started" timer finished.'
-
-      # Stopped timer finished: Cancel any running Started timer and switch the running state to Stopped
-      - conditions:
-          - condition: template
-            value_template: "{{ trigger.event is defined and trigger.event.data.entity_id == stopped_timer_id }}"
-        sequence:
-          - action: timer.cancel
-            target:
-              entity_id: !input started_timer_helper
-          - action: input_boolean.turn_off
-            target:
-              entity_id: !input running_state_helper
-          - stop: 'Appliance state set to OFF, "off" timer finished.'
-
-      # Vibration detected -> Cancel any running Stopped timer and start a Started timer
-      - conditions:
-          - condition: state
-            entity_id: !input vibration_sensor
-            state: "on"
+            value_template: "{{ trigger.event is defined and trigger.event.data.entity_id == debounce_timer_id }}"
         sequence:
           - action: timer.cancel
             target:
@@ -152,14 +133,58 @@ actions:
                   entity_id: !input started_timer_helper
                 data:
                   duration: !input start_delay
+          - stop: 'Debounce confirmed vibration, proceeding with cycle start logic.'
 
-      # Vibration sensor idle: Start a Stopped timer
+      # Started timer finished: Switch the running state to Started
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event is defined and trigger.event.data.entity_id == started_timer_id }}"
+        sequence:
+          - service: input_boolean.turn_on
+            target:
+              entity_id: !input running_state_helper
+          - stop: 'Appliance state set to Started, "started" timer finished.'
+
+      # Stopped timer finished: Cancel any running Started timer and switch the running state to Stopped
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.event is defined and trigger.event.data.entity_id == stopped_timer_id }}"
+        sequence:
+          - service: timer.cancel
+            target:
+              entity_id: !input started_timer_helper
+          - service: input_boolean.turn_off
+            target:
+              entity_id: !input running_state_helper
+          - stop: 'Appliance state set to OFF, "off" timer finished.'
+
+      # Vibration detected -> Start the debounce timer
+      - conditions:
+          - condition: state
+            entity_id: !input vibration_sensor
+            state: "on"
+        sequence:
+          - if:
+              - condition: state
+                entity_id: !input debounce_timer_helper
+                state: "idle"
+            then:
+              - service: timer.start
+                target:
+                  entity_id: !input debounce_timer_helper
+                data:
+                  duration: !input short_vibration_delay
+
+      # Vibration sensor idle: Cancel debounce and start a Stopped timer
       - conditions:
           - condition: state
             entity_id: !input vibration_sensor
             state: "off"
         sequence:
-          - action: timer.start
+          - service: timer.cancel
+            target:
+              entity_id: !input debounce_timer_helper
+          - service: timer.start
             target:
               entity_id: !input stopped_timer_helper
             data:
